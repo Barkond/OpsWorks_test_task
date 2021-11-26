@@ -4,5 +4,6 @@
 - Got questions data from the consecutive request
 - Yielded the item
 
-**What I didn't:**
-- Didn't have the time to figure out how to simulate the ZIP code in request to get the price data.
+**What I did late:**
+- Extracted the price from the API
+- Fixed the item
