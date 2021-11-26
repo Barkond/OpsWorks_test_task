@@ -6,6 +6,8 @@ class IphoneItem(scrapy.Item):
     price = scrapy.Field()
     images = scrapy.Field()
     description = scrapy.Field()
-    higlights = scrapy.Field()
+    highlights = scrapy.Field()
     question = scrapy.Field()
+    answer = scrapy.Field()
+    sku = scrapy.Field()
 

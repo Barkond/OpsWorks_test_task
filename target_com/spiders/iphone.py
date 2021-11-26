@@ -1,6 +1,7 @@
 import json
 import scrapy
 from scrapy.http.headers import Headers
+from target_com.items import IphoneItem
 
 RENDER_HTML_URL = "http://127.0.0.1:8050/render.html"
 
@@ -41,8 +42,6 @@ class IphoneSpider(scrapy.Spider):
     def parse(self, response):
         name = response.css('h1.Heading__Styled'
                             'Heading-sc-1mp23s9-0 > span::text').get()
-        price = response.css('div.web-migration-to'
-                             'f__PriceFontSize-sc-14z8sos-16::text').get()
 
         images = []
         for image in response.css('div.slideDeckPicture img'):
@@ -59,23 +58,44 @@ class IphoneSpider(scrapy.Spider):
             highlight_text = highlight.css('span::text').get()
             highlights.append(highlight_text)
 
+        sku = response.xpath(
+            '//script[contains(text(), "x-api-key")]').re_first(
+            r'"Product","tcin":"(.*?)"')
+
         pre_item = {
             'name': name,
-            'price': price,
             'description': description,
-            'highlights': highlights
+            'highlights': highlights,
+            'sku': sku,
+            'images': images
         }
+        api_key = response.xpath('//script[contains(text(), "x-api-key")]').re_first(r'"x-api-key","value":"(.*?)"')
+        print(sku)
+        print(api_key)
         yield scrapy.Request(url='https://r2d2.target.com/ggc/Q&A/v1/question'
                                  '-answer?type=product&questionedId=81406260&'
                                  'page=0&size=10&sortBy=MOST_ANSWERS&key=c6b6'
                                  '8aaef0eac4df4931aae70500b7056531cb37&errorT'
                                  'ag=drax_domain_questions_api_error',
                              callback=self.parse_questions,
-                             meta={'pre_item': pre_item})
+                             meta={'pre_item': pre_item,
+                                   'api_key': api_key})
 
     def parse_questions(self, response):  # NOQA
         item = response.meta['pre_item']
-        item['question_text'] = json.loads(response.text)['results'][0]['text']
-        item['question_answer'] = \
-        json.loads(response.text)['results'][0]['answers'][0]['text']
+        item['question'] = json.loads(response.text)['results'][0]['text']
+        item['answer'] = json.loads(response.text)['results'][0]['answers'][0]['text']
+        url = 'https://redsky.target.com/redsky_aggregations/v1/web/pdp_client_v1?'\
+              f'key={response.meta["api_key"]}&tcin={response.meta["pre_item"]["sku"]}'\
+              '&store_id=1338&pricing_store_id=1338&'\
+              'latitude=50.490&longitude=30.420&state=30&zip=04070'
+        print(url)
+        yield scrapy.Request(url=url, callback=self.parse_api, meta={'pre_item': item})
+
+    def parse_api(self, response):  # NOQA
+        pre_item = response.meta['pre_item']
+        api_data = json.loads(response.text)
+        price = api_data['data']['product']['price']['current_retail']
+        item = IphoneItem(**pre_item)
+        item['price'] = price
         yield item
